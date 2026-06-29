@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Summer Quest — Token Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12152b;
+    --bg-soft: #181c38;
+    --card: #1f2344;
+    --card-hi: #272b52;
+    --line: #323761;
+    --ink: #eef0fb;
+    --ink-dim: #a6acd6;
+    --gold: #ffd23f;
+    --gold-deep: #f5a623;
+    --c-academic: #5eead4;
+    --c-academic-deep:#14b8a6;
+    --c-sport: #fb923c;
+    --c-sport-deep:#ea580c;
+    --c-meals: #f472b6;
+    --c-meals-deep:#db2777;
+    --c-chess: #a78bfa;
+    --c-chess-deep:#7c3aed;
+    --c-writing: #fbbf24;
+    --c-writing-deep:#d97706;
+  }
+  *{-webkit-tap-highlight-color: transparent;}
+  html,body{
+		    background: radial-gradient(1200px 800px at 20% -10%, #1c2150 0%, var(--bg) 55%), var(--bg);
+		    color: var(--ink);
+		    font-family: 'Inter', sans-serif;
+		    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  .font-display{ font-family: 'Baloo 2', sans-serif; }
+  /* hide scrollbars but keep scrolling */
+  .no-scrollbar::-webkit-scrollbar{ display:none; }
+  .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+
+  .safe-top{ padding-top: env(safe-area-inset-top); }
+  .safe-bottom{ padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Console-style card */
+  .quest-card{
+    background: linear-gradient(180deg, var(--card-hi), var(--card));
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 24px -12px rgba(0,0,0,0.6);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .quest-card:active{ transform: scale(0.985); }
+
+  .quest-card.done{
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent) inset, 0 10px 24px -12px rgba(0,0,0,0.6);
+  }
+
+  .check-box{
+    width: 44px; height:44px; min-width:44px; border-radius: 14px;
+    border: 2.5px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    transition: all .15s cubic-bezier(.34,1.56,.64,1);
+    background: rgba(255,255,255,0.02);
+  }
+  .check-box.checked{
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.04) rotate(-3deg);
+  }
+  .check-box.checked svg{ stroke: #0b0d1f; }
+
+  .tab-btn{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; flex:1; padding: 8px 2px 6px;
+    color: var(--ink-dim);
+    transition: color .15s ease, transform .12s ease;
+    min-height: 56px;
+  }
+  .tab-btn.active{ color: var(--gold); }
+  .tab-btn:active{ transform: scale(0.93); }
+  .tab-pill{
+    position:absolute; bottom: 100%; margin-bottom:4px;
+    width: 30px; height:4px; border-radius:99px; background: var(--gold);
+    opacity:0; transition: opacity .15s ease;
+  }
+  .tab-btn.active .tab-pill{ opacity:1; }
+
+  .progress-track{ background: rgba(255,255,255,0.06); border-radius: 99px; overflow:hidden; }
+  .progress-fill{
+    height:100%; border-radius:99px;
+    background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+    transition: width .5s cubic-bezier(.16,1,.3,1);
+  }
+
+  .token-chip{
+    background: linear-gradient(180deg, #2a2150, #1c1840);
+    border: 1.5px solid #3d3370;
+  }
+
+  .lvl-ring{
+    background: conic-gradient(var(--gold) calc(var(--pct) * 1%), rgba(255,255,255,0.08) 0);
+  }
+
+  .shop-card{
+    background: linear-gradient(160deg, var(--card-hi), var(--card));
+    border: 1px solid var(--line);
+    border-radius: 22px;
+  }
+  .shop-card.affordable{ border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+  .shop-card.locked{ opacity: 0.5; }
+
+  .btn-press{ transition: transform .1s ease; }
+  .btn-press:active{ transform: scale(0.95); }
+
+  .sheet{
+    transform: translateY(100%);
+    transition: transform .32s cubic-bezier(.16,1,.3,1);
+  }
+  .sheet.open{ transform: translateY(0); }
+  .sheet-backdrop{
+    opacity:0; pointer-events:none; transition: opacity .25s ease;
+  }
+  .sheet-backdrop.open{ opacity:1; pointer-events:auto; }
+
+  .category-glow{ box-shadow: 0 0 40px -10px var(--accent); }
+
+  input[type=number]::-webkit-inner-spin-button{ opacity:1; }
+
+  @keyframes pop-in{ 0%{ transform: scale(0.85); opacity:0;} 100%{ transform:scale(1); opacity:1;} }
+  .pop-in{ animation: pop-in .25s cubic-bezier(.34,1.56,.64,1); }
+
+  @keyframes float-y{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-6px);} }
+  .float-y{ animation: float-y 3.4s ease-in-out infinite; }
+
+  ::selection{ background: var(--gold); color:#12152b; }
+</style>
+</head>
+<body class="min-h-screen safe-top">
+
+<div id="app" class="max-w-2xl mx-auto pb-32 min-h-screen"></div>
+
+<!-- ===== TAB BAR ===== -->
+<nav id="tabbar" class="fixed bottom-0 left-0 right-0 z-40 safe-bottom">
+  <div class="max-w-2xl mx-auto px-3 pb-2 pt-1">
+    <div class="flex items-stretch rounded-[26px] px-1" style="background: linear-gradient(180deg, #1c2042, #14172f); border:1px solid var(--line); box-shadow: 0 -8px 30px -10px rgba(0,0,0,0.7);">
+    </div>
+  </div>
+</nav>
+
+<!-- ===== PARENT SETTINGS LOCK MODAL (mounted dynamically) ===== -->
+<div id="modal-root"></div>
+
+<script>
+/* ============================================================
+   SUMMER QUEST DASHBOARD
+   Single-file app. No build step. Tailwind + Lucide + canvas-confetti via CDN.
+   Data persists to localStorage under key "summerQuest_v1".
+   ============================================================ */
+
+const STORAGE_KEY = "summerQuest_v1";
+
+/* ---------- Default categories (seeded from this chat's plans) ---------- */
+const DEFAULT_CATEGORIES = [
+  { id: "academic", label: "Academic",  icon: "book-open",     color: "var(--c-academic)", colorDeep: "var(--c-academic-deep)" },
+  { id: "sport",    label: "Sport & Fitness", icon: "dumbbell", color: "var(--c-sport)",    colorDeep: "var(--c-sport-deep)" },
+  { id: "meals",    label: "Meals",      icon: "utensils-crossed", color: "var(--c-meals)", colorDeep: "var(--c-meals-deep)" },
+  { id: "chess",    label: "Chess",       icon: "crown",        color: "var(--c-chess)",    colorDeep: "var(--c-chess-deep)" },
+  { id: "writing",  label: "Writing",     icon: "feather",      color: "var(--c-writing)",  colorDeep: "var(--c-writing-deep)" },
+];
+
+/* ---------- Seed tasks: a representative slice from each plan ---------- */
+function seedTasks(){
+  const t = [];
+  let id = 1;
+  const push = (cat, text) => t.push({ id: id++, cat, text, done: false, doneAt: null });
+
+  // Academic — daily structure + a few concrete sample days
+  push("academic","Session 1 (08:00): Maths — today's GC book pages");
+  push("academic","Session 2 (09:00): VR / NVR / English Comprehension");
+  push("academic","Session 3 (10:00): Science / History / Geography / French");
+  push("academic","Kangaroo Maths Olympiad practice (15–20 min)");
+  push("academic","GC Vocabulary flashcards (10 min, morning)");
+  push("academic","Saturday mock paper — Maths + English GL");
+
+  // Sport & Fitness
+  push("sport","Heat knee 15 min before sport");
+  push("sport","Today's sport session (Cricket / RAD Ballet / Fencing)");
+  push("sport","Ice knee 15–20 min after sport");
+  push("sport","OSD stretch — quad + hamstring 3×30 sec");
+  push("sport","Hip abductor + calf raise strength set");
+  push("sport","Saturday swim or gentle walk");
+
+  // Meals
+  push("meals","Breakfast eaten");
+  push("meals","Mid-morning snack (Chiwda / fruit)");
+  push("meals","Lunch eaten");
+  push("meals","Afternoon snack (Besan Ladu + milk)");
+  push("meals","Dinner eaten with green veg");
+  push("meals","Haldi doodh before bed");
+
+  // Chess
+  push("chess","ChessKid lesson (10 min)");
+  push("chess","Puzzle Rush — untimed accuracy practice");
+  push("chess","1 game vs CPU or live opponent");
+  push("chess","Write down 1 lesson from today's game");
+
+  // Writing
+  push("writing","Today's writing piece (descriptive / recount / summary / essay)");
+  push("writing","Read piece aloud, fix 1 sentence");
+  push("writing","Add 1 new word from the vocabulary list");
+
+  return t;
+}
+
+/* ---------- Default shop items ---------- */
+function seedShop(){
+  return [
+    { id: 1, name: "30 Mins Screen Time", price: 50, icon: "tablet-smartphone" },
+    { id: 2, name: "Choose Dessert Tonight", price: 40, icon: "ice-cream-cone" },
+    { id: 3, name: "Pick Weekend Movie", price: 100, icon: "clapperboard" },
+    { id: 4, name: "Stay Up 30 Min Late", price: 80, icon: "moon-star" },
+    { id: 5, name: "Family Game Night Pick", price: 70, icon: "gamepad-2" },
+    { id: 6, name: "Small Toy / Lego Set", price: 250, icon: "gift" },
+    { id: 7, name: "Trip to the Park / Ice Cream", price: 120, icon: "ice-cream" },
+    { id: 8, name: "Day Off Chores", price: 150, icon: "sparkles" },
+  ];
+}
+
+/* ---------- State ---------- */
+let state = loadState();
+
+function defaultState(){
+  return {
+    tokens: 0,
+    tasks: seedTasks(),
+    categories: DEFAULT_CATEGORIES,
+    shop: seedShop(),
+    purchases: [], // {id, name, price, boughtAt}
+    history: [],   // {taskId, action, ts} not strictly required but nice for future
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    // basic shape guard
+    if(!parsed.tasks || !parsed.shop || !parsed.categories) return defaultState();
+    return parsed;
+  }catch(e){
+    console.warn("Could not load saved data, starting fresh.", e);
+    return defaultState();
+  }
+}
+
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+/* ---------- Router ---------- */
+let currentTab = "home"; // home | tasks | shop | settings(gated)
+let currentTaskCat = "academic";
+
+function render(){
+  const app = document.getElementById("app");
+  if(currentTab === "home") app.innerHTML = renderHome();
+  else if(currentTab === "tasks") app.innerHTML = renderTasks();
+  else if(currentTab === "shop") app.innerHTML = renderShop();
+  renderTabbar();
+  lucide.createIcons();
+  attachHandlers();
+}
+
+/* ---------- Helpers ---------- */
+function catTasks(catId){ return state.tasks.filter(t => t.cat === catId); }
+function catDoneCount(catId){ return catTasks(catId).filter(t => t.done).length; }
+function catPct(catId){
+  const all = catTasks(catId);
+  if(all.length === 0) return 0;
+  return Math.round((catDoneCount(catId) / all.length) * 100);
+}
+function totalPct(){
+  if(state.tasks.length === 0) return 0;
+  return Math.round((state.tasks.filter(t=>t.done).length / state.tasks.length) * 100);
+}
+function levelFromTokens(tok){
+  return Math.max(1, Math.floor(Math.sqrt(tok / 8)) + 1);
+}
+function tokensForNextLevel(level){
+  return Math.pow(level, 2) * 8;
+}
+function getCat(catId){ return state.categories.find(c => c.id === catId) || state.categories[0]; }
+
+function fireConfetti(originEl){
+  let x = 0.5, y = 0.5;
+  if(originEl){
+    const r = originEl.getBoundingClientRect();
+    x = (r.left + r.width/2) / window.innerWidth;
+    y = (r.top + r.height/2) / window.innerHeight;
+  }
+  confetti({
+    particleCount: 60,
+    spread: 65,
+    startVelocity: 32,
+    origin: { x, y },
+    colors: ['#ffd23f','#5eead4','#fb923c','#f472b6','#a78bfa'],
+    scalar: 0.9,
+    ticks: 160,
+  });
+}
+
+function bigConfetti(){
+  const duration = 900;
+  const end = Date.now() + duration;
+  (function frame(){
+    confetti({ particleCount: 5, angle: 60, spread: 70, origin: { x: 0 }, colors:['#ffd23f','#5eead4','#fb923c'] });
+    confetti({ particleCount: 5, angle: 120, spread: 70, origin: { x: 1 }, colors:['#f472b6','#a78bfa','#ffd23f'] });
+    if(Date.now() < end) requestAnimationFrame(frame);
+  })();
+}
+
+/* ---------- HOME ---------- */
+function renderHome(){
+  const tok = state.tokens;
+  const level = levelFromTokens(tok);
+  const nextAt = tokensForNextLevel(level);
+  const prevAt = tokensForNextLevel(level - 1) || 0;
+  const levelPct = Math.min(100, Math.round(((tok - prevAt) / (nextAt - prevAt)) * 100));
+  const pct = totalPct();
+  const doneToday = state.tasks.filter(t=>t.done).length;
+
+  const catCards = state.categories.map(c => {
+    const p = catPct(c.id);
+    const done = catDoneCount(c.id);
+    const tot = catTasks(c.id).length;
+    return `
+    <button data-goto-cat="${c.id}" class="quest-card btn-press text-left p-4 flex flex-col gap-3" style="--accent:${c.color}; --accent-deep:${c.colorDeep};">
+      <div class="flex items-center justify-between">
+        <div class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background: color-mix(in srgb, ${c.color} 22%, transparent);">
+          <i data-lucide="${c.icon}" class="w-6 h-6" style="color:${c.color}"></i>
+        </div>
+        <span class="font-display font-bold text-sm" style="color:${c.color}">${p}%</span>
+      </div>
+      <div>
+        <div class="font-display font-bold text-[15px] text-white leading-tight">${c.label}</div>
+        <div class="text-[12px] text-[var(--ink-dim)] mt-0.5">${done}/${tot} done</div>
+      </div>
+      <div class="progress-track h-2 w-full" style="--accent:${c.color}; --accent-deep:${c.colorDeep};">
+        <div class="progress-fill" style="width:${p}%"></div>
+      </div>
+    </button>`;
+  }).join("");
+
+  return `
+  <div class="px-4 pt-5">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <div class="text-[13px] text-[var(--ink-dim)] font-medium">Welcome back,</div>
+        <div class="font-display font-extrabold text-2xl text-white -mt-0.5">Summer Quest 🌞</div>
+      </div>
+      <button id="open-settings" class="w-11 h-11 rounded-2xl flex items-center justify-center btn-press" style="background:var(--card); border:1px solid var(--line);">
+        <i data-lucide="settings" class="w-5 h-5 text-[var(--ink-dim)]"></i>
+      </button>
+    </div>
+
+    <!-- Level + token hero -->
+    <div class="quest-card p-5 mb-5 relative overflow-hidden" style="--accent:var(--gold); --accent-deep:var(--gold-deep);">
+      <div class="absolute -right-8 -top-8 w-40 h-40 rounded-full opacity-20 float-y" style="background: radial-gradient(circle, var(--gold), transparent 70%);"></div>
+      <div class="flex items-center gap-4 relative">
+        <div class="relative w-20 h-20 rounded-full lvl-ring flex items-center justify-center shrink-0" style="--pct:${levelPct};">
+          <div class="w-[68px] h-[68px] rounded-full flex flex-col items-center justify-center" style="background: var(--bg-soft);">
+            <span class="font-display font-extrabold text-xl text-white leading-none">${level}</span>
+            <span class="text-[9px] uppercase tracking-wide text-[var(--ink-dim)] font-semibold mt-0.5">Level</span>
+          </div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 mb-1">
+            <i data-lucide="coins" class="w-5 h-5" style="color:var(--gold)"></i>
+            <span class="font-display font-extrabold text-2xl text-white">${tok}</span>
+            <span class="text-[13px] text-[var(--ink-dim)] font-medium mb-0.5">tokens</span>
+          </div>
+          <div class="progress-track h-2.5 w-full" style="--accent:var(--gold); --accent-deep:var(--gold-deep);">
+            <div class="progress-fill" style="width:${levelPct}%"></div>
+          </div>
+          <div class="text-[11px] text-[var(--ink-dim)] mt-1 font-medium">${nextAt - tok > 0 ? `${nextAt - tok} tokens to Level ${level+1}` : `Max level vibes!`}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Today progress -->
+    <div class="quest-card p-4 mb-5 flex items-center gap-4" style="--accent:#7dd3fc;">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style="background: rgba(125,211,252,0.15);">
+        <i data-lucide="target" class="w-6 h-6 text-sky-300"></i>
+      </div>
+      <div class="flex-1">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-display font-bold text-white text-[15px]">All Quests</span>
+          <span class="font-display font-bold text-sky-300 text-[15px]">${pct}%</span>
+        </div>
+        <div class="progress-track h-2.5 w-full" style="--accent:#7dd3fc; --accent-deep:#0ea5e9;">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="text-[11px] text-[var(--ink-dim)] mt-1 font-medium">${doneToday}/${state.tasks.length} tasks checked off</div>
+      </div>
+    </div>
+
+    <div class="font-display font-bold text-white text-lg mb-3 px-1">Your Quest Lines</div>
+    <div class="grid grid-cols-2 gap-3">
+      ${catCards}
+    </div>
+  </div>`;
+}
+
+/* ---------- TASKS ---------- */
+function renderTasks(){
+  const cat = getCat(currentTaskCat);
+  const tabs = state.categories.map(c => `
+    <button data-tasktab="${c.id}" class="shrink-0 px-4 py-2.5 rounded-2xl font-display font-bold text-[13px] btn-press flex items-center gap-1.5 whitespace-nowrap"
+      style="${c.id===currentTaskCat
+        ? `background:${c.color}; color:#0b0d1f;`
+        : `background:var(--card); color:var(--ink-dim); border:1px solid var(--line);`}">
+      <i data-lucide="${c.icon}" class="w-4 h-4"></i>${c.label}
+    </button>`).join("");
+
+  const tasks = catTasks(cat.id);
+  const rows = tasks.length ? tasks.map(t => `
+    <div class="quest-card ${t.done ? 'done':''} p-3.5 flex items-center gap-3.5" style="--accent:${cat.color};" data-task-row="${t.id}">
+      <button data-toggle="${t.id}" class="check-box ${t.done ? 'checked':''}" style="--accent:${cat.color};" aria-label="Toggle task complete">
+        ${t.done ? `<i data-lucide="check" class="w-6 h-6" stroke-width="3"></i>` : ``}
+      </button>
+      <div class="flex-1 min-w-0">
+        <div class="text-[14.5px] font-semibold leading-snug ${t.done ? 'text-[var(--ink-dim)] line-through' : 'text-white'}">${escapeHtml(t.text)}</div>
+      </div>
+      ${t.done ? `<span class="font-display font-bold text-[12px] shrink-0" style="color:${cat.color}">+10</span>` : ``}
+    </div>
+  `).join("") : `
+    <div class="text-center py-16">
+      <i data-lucide="party-popper" class="w-12 h-12 mx-auto mb-3 text-[var(--ink-dim)]"></i>
+      <div class="text-[var(--ink-dim)] font-medium text-sm">No quests here yet.<br/>Ask a parent to add some in Settings.</div>
+    </div>`;
+
+  return `
+  <div class="px-4 pt-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="font-display font-extrabold text-2xl text-white">Quests</div>
+      <div class="token-chip rounded-full px-3.5 py-2 flex items-center gap-1.5">
+        <i data-lucide="coins" class="w-4 h-4" style="color:var(--gold)"></i>
+        <span class="font-display font-bold text-[14px] text-white">${state.tokens}</span>
+      </div>
+    </div>
+
+    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1 mb-4 -mx-4 px-4">
+      ${tabs}
+    </div>
+
+    <div class="quest-card p-4 mb-4 flex items-center gap-3" style="--accent:${cat.color};">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style="background: color-mix(in srgb, ${cat.color} 22%, transparent);">
+        <i data-lucide="${cat.icon}" class="w-5 h-5" style="color:${cat.color}"></i>
+      </div>
+      <div class="flex-1">
+        <div class="progress-track h-2 w-full" style="--accent:${cat.color}; --accent-deep:${cat.colorDeep};">
+          <div class="progress-fill" style="width:${catPct(cat.id)}%"></div>
+        </div>
+      </div>
+      <span class="font-display font-bold text-sm shrink-0" style="color:${cat.color}">${catPct(cat.id)}%</span>
+    </div>
+
+    <div class="space-y-2.5 mb-6">
+      ${rows}
+    </div>
+  </div>`;
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ---------- SHOP ---------- */
+function renderShop(){
+  const cards = state.shop.map(item => {
+    const can = state.tokens >= item.price;
+    return `
+    <div class="shop-card ${can?'affordable':'locked'} p-4 flex flex-col gap-3">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background: rgba(255,210,63,0.12);">
+        <i data-lucide="${item.icon}" class="w-6 h-6" style="color:var(--gold)"></i>
+      </div>
+      <div class="flex-1">
+        <div class="font-display font-bold text-white text-[15px] leading-tight">${escapeHtml(item.name)}</div>
+      </div>
+      <button data-buy="${item.id}" ${can ? '' : 'disabled'}
+        class="btn-press w-full rounded-2xl py-3 font-display font-bold text-[14px] flex items-center justify-center gap-1.5"
+        style="${can ? 'background:var(--gold); color:#0b0d1f;' : 'background:var(--card-hi); color:var(--ink-dim);'}">
+        <i data-lucide="coins" class="w-4 h-4"></i> ${item.price}
+      </button>
+    </div>`;
+  }).join("");
+
+  const history = state.purchases.slice().reverse().slice(0,8).map(p => `
+    <div class="flex items-center justify-between py-2.5 border-b" style="border-color:var(--line);">
+      <span class="text-[13.5px] text-white font-medium">${escapeHtml(p.name)}</span>
+      <span class="text-[12px] text-[var(--ink-dim)] font-semibold">-${p.price} <span class="text-[var(--gold)]">●</span></span>
+    </div>`).join("") || `<div class="text-[var(--ink-dim)] text-[13px] py-3 text-center">No rewards redeemed yet — go earn some tokens!</div>`;
+
+  return `
+  <div class="px-4 pt-5">
+    <div class="flex items-center justify-between mb-4">
+      <div class="font-display font-extrabold text-2xl text-white">Reward Shop</div>
+      <div class="token-chip rounded-full px-3.5 py-2 flex items-center gap-1.5">
+        <i data-lucide="coins" class="w-4 h-4" style="color:var(--gold)"></i>
+        <span class="font-display font-bold text-[14px] text-white">${state.tokens}</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 mb-6">
+      ${cards}
+    </div>
+
+    <div class="font-display font-bold text-white text-lg mb-3 px-1">Redeemed</div>
+    <div class="quest-card p-4 mb-8">
+      ${history}
+    </div>
+  </div>`;
+}
+
+/* ---------- TAB BAR ---------- */
+function renderTabbar(){
+  const tabs = [
+    { id: "home",  label: "Home",  icon: "home" },
+    { id: "tasks", label: "Quests", icon: "list-checks" },
+    { id: "shop",  label: "Shop",   icon: "store" },
+  ];
+  const html = tabs.map(t => `
+    <button data-tab="${t.id}" class="tab-btn relative ${currentTab===t.id ? 'active':''}">
+      <span class="tab-pill"></span>
+      <i data-lucide="${t.icon}" class="w-6 h-6"></i>
+      <span class="font-display font-bold text-[11px]">${t.label}</span>
+    </button>`).join("");
+  document.querySelector("#tabbar .flex").innerHTML = html;
+}
+
+/* ============================================================
+   PARENT GATE — simple multiplication problem
+   ============================================================ */
+function randomMathProblem(){
+  const a = Math.floor(Math.random()*9) + 2;  // 2-10
+  const b = Math.floor(Math.random()*9) + 2;
+  return { a, b, answer: a*b };
+}
+
+function openParentGate(){
+  const problem = randomMathProblem();
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `
+  <div id="gate-backdrop" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" style="background: rgba(8,9,20,0.72); backdrop-filter: blur(3px);">
+    <div class="pop-in w-full sm:max-w-sm rounded-t-[28px] sm:rounded-[28px] p-6 pb-8" style="background: linear-gradient(180deg, var(--card-hi), var(--card)); border:1px solid var(--line);">
+      <div class="flex flex-col items-center text-center mb-5">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center mb-3" style="background: rgba(167,139,250,0.18);">
+          <i data-lucide="shield" class="w-7 h-7" style="color:var(--c-chess)"></i>
+        </div>
+        <div class="font-display font-extrabold text-xl text-white">Parents Only</div>
+        <div class="text-[13px] text-[var(--ink-dim)] mt-1">Solve this to open settings</div>
+      </div>
+      <div class="font-display font-extrabold text-3xl text-white text-center mb-4">${problem.a} × ${problem.b} = ?</div>
+      <input id="gate-input" type="number" inputmode="numeric" placeholder="Your answer"
+        class="w-full text-center text-xl font-display font-bold rounded-2xl py-4 mb-2 text-white"
+        style="background: var(--bg-soft); border: 2px solid var(--line); outline:none;" />
+      <div id="gate-error" class="text-center text-[13px] font-semibold mb-3 h-4" style="color:#fb7185;"></div>
+      <div class="flex gap-3">
+        <button id="gate-cancel" class="flex-1 btn-press rounded-2xl py-4 font-display font-bold text-[14px]" style="background:var(--card-hi); color:var(--ink-dim); border:1px solid var(--line);">Cancel</button>
+        <button id="gate-submit" class="flex-1 btn-press rounded-2xl py-4 font-display font-bold text-[14px]" style="background:var(--c-chess); color:#0b0d1f;">Unlock</button>
+      </div>
+    </div>
+  </div>`;
+  lucide.createIcons();
+  const input = document.getElementById("gate-input");
+  setTimeout(()=> input.focus(), 50);
+
+  function tryUnlock(){
+    if(parseInt(input.value, 10) === problem.answer){
+      root.innerHTML = "";
+      openSettings();
+    }else{
+      document.getElementById("gate-error").textContent = "Not quite — try again!";
+      input.value = "";
+      input.focus();
+    }
+  }
+  document.getElementById("gate-submit").onclick = tryUnlock;
+  input.addEventListener("keydown", e => { if(e.key === "Enter") tryUnlock(); });
+  document.getElementById("gate-cancel").onclick = () => { root.innerHTML = ""; };
+  document.getElementById("gate-backdrop").addEventListener("click", e => {
+    if(e.target.id === "gate-backdrop") root.innerHTML = "";
+  });
+}
+
+/* ============================================================
+   SETTINGS / PARENT ADMIN PANEL
+   ============================================================ */
+let settingsTab = "tasks"; // tasks | shop | data
+let settingsTaskCat = "academic";
+
+function openSettings(){
+  const root = document.getElementById("modal-root");
+  root.innerHTML = `<div id="settings-backdrop" class="fixed inset-0 z-50" style="background: rgba(8,9,20,0.85);"></div>
+    <div id="settings-sheet" class="fixed inset-0 z-50 flex flex-col" style="background: var(--bg);">
+      ${settingsInnerHtml()}
+    </div>`;
+  lucide.createIcons();
+  attachSettingsHandlers();
+}
+
+function settingsInnerHtml(){
+  return `
+    <div class="safe-top px-4 pt-4 pb-3 flex items-center justify-between shrink-0" style="border-bottom:1px solid var(--line);">
+      <div class="font-display font-extrabold text-xl text-white flex items-center gap-2">
+        <i data-lucide="shield" class="w-5 h-5" style="color:var(--c-chess)"></i> Parent Settings
+      </div>
+      <button id="settings-close" class="w-10 h-10 rounded-2xl flex items-center justify-center btn-press" style="background:var(--card);">
+        <i data-lucide="x" class="w-5 h-5 text-white"></i>
+      </button>
+    </div>
+
+    <div class="flex gap-2 px-4 pt-3 pb-2 shrink-0">
+      ${[["tasks","Tasks","list-checks"],["shop","Shop Items","store"],["data","Data","database"]].map(([id,label,icon])=>`
+        <button data-settingstab="${id}" class="flex-1 py-2.5 rounded-2xl font-display font-bold text-[13px] flex items-center justify-center gap-1.5 btn-press"
+          style="${settingsTab===id ? 'background:var(--c-chess); color:#0b0d1f;' : 'background:var(--card); color:var(--ink-dim); border:1px solid var(--line);'}">
+          <i data-lucide="${icon}" class="w-4 h-4"></i>${label}
+        </button>`).join("")}
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-4 pb-8" id="settings-body">
+      ${settingsTab === "tasks" ? settingsTasksHtml() : settingsTab === "shop" ? settingsShopHtml() : settingsDataHtml()}
+    </div>
+  `;
+}
+
+function settingsTasksHtml(){
+  const catChips = state.categories.map(c => `
+    <button data-settaskcat="${c.id}" class="shrink-0 px-3.5 py-2 rounded-xl font-display font-bold text-[12px] btn-press flex items-center gap-1.5"
+      style="${c.id===settingsTaskCat ? `background:${c.color}; color:#0b0d1f;` : 'background:var(--card); color:var(--ink-dim); border:1px solid var(--line);'}">
+      <i data-lucide="${c.icon}" class="w-3.5 h-3.5"></i>${c.label}
+    </button>`).join("");
+
+  const tasks = catTasks(settingsTaskCat);
+  const rows = tasks.map(t => `
+    <div class="flex items-center gap-2.5 py-2.5" style="border-bottom:1px solid var(--line);">
+      <div class="flex-1 text-[13.5px] text-white font-medium">${escapeHtml(t.text)} ${t.done ? '<span class="text-[10px] font-bold" style="color:var(--c-academic)">✓ done</span>' : ''}</div>
+      <button data-deltask="${t.id}" class="w-9 h-9 rounded-xl flex items-center justify-center btn-press shrink-0" style="background: rgba(251,113,133,0.15);">
+        <i data-lucide="trash-2" class="w-4 h-4" style="color:#fb7185"></i>
+      </button>
+    </div>`).join("") || `<div class="text-[var(--ink-dim)] text-[13px] py-6 text-center">No tasks in this category yet.</div>`;
+
+  return `
+    <div class="flex gap-2 overflow-x-auto no-scrollbar mb-4 pb-1">${catChips}</div>
+    <div class="quest-card p-4 mb-4">
+      <div class="font-display font-bold text-white text-[14px] mb-3">Add a new task</div>
+      <input id="new-task-text" type="text" placeholder="e.g. Practise scales for 10 min"
+        class="w-full rounded-xl py-3 px-3.5 mb-3 text-white text-[14px]" style="background:var(--bg-soft); border:1.5px solid var(--line); outline:none;" />
+      <button id="add-task-btn" class="w-full btn-press rounded-xl py-3 font-display font-bold text-[14px] flex items-center justify-center gap-1.5" style="background:var(--c-academic); color:#0b0d1f;">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add Task
+      </button>
+    </div>
+    <div class="quest-card p-4">
+      <div class="font-display font-bold text-white text-[14px] mb-2">Existing tasks</div>
+      ${rows}
+    </div>
+  `;
+}
+
+function settingsShopHtml(){
+  const rows = state.shop.map(item => `
+    <div class="flex items-center gap-2.5 py-2.5" style="border-bottom:1px solid var(--line);">
+      <i data-lucide="${item.icon}" class="w-4 h-4 shrink-0" style="color:var(--gold)"></i>
+      <div class="flex-1 text-[13.5px] text-white font-medium truncate">${escapeHtml(item.name)}</div>
+      <div class="text-[12px] font-bold shrink-0" style="color:var(--gold)">${item.price} tok</div>
+      <button data-delshop="${item.id}" class="w-9 h-9 rounded-xl flex items-center justify-center btn-press shrink-0" style="background: rgba(251,113,133,0.15);">
+        <i data-lucide="trash-2" class="w-4 h-4" style="color:#fb7185"></i>
+      </button>
+    </div>`).join("") || `<div class="text-[var(--ink-dim)] text-[13px] py-6 text-center">No shop items yet.</div>`;
+
+  return `
+    <div class="quest-card p-4 mb-4">
+      <div class="font-display font-bold text-white text-[14px] mb-3">Add a reward</div>
+      <input id="new-shop-name" type="text" placeholder="e.g. 30 Mins Screen Time"
+        class="w-full rounded-xl py-3 px-3.5 mb-3 text-white text-[14px]" style="background:var(--bg-soft); border:1.5px solid var(--line); outline:none;" />
+      <input id="new-shop-price" type="number" inputmode="numeric" placeholder="Price in tokens (e.g. 50)"
+        class="w-full rounded-xl py-3 px-3.5 mb-3 text-white text-[14px]" style="background:var(--bg-soft); border:1.5px solid var(--line); outline:none;" />
+      <button id="add-shop-btn" class="w-full btn-press rounded-xl py-3 font-display font-bold text-[14px] flex items-center justify-center gap-1.5" style="background:var(--gold); color:#0b0d1f;">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add Reward
+      </button>
+    </div>
+    <div class="quest-card p-4">
+      <div class="font-display font-bold text-white text-[14px] mb-2">Existing rewards</div>
+      ${rows}
+    </div>
+  `;
+}
+
+function settingsDataHtml(){
+  return `
+    <div class="quest-card p-4 mb-4">
+      <div class="font-display font-bold text-white text-[14px] mb-1">Token balance</div>
+      <div class="text-[12.5px] text-[var(--ink-dim)] mb-3">Manually adjust if needed (e.g. correcting a mistake).</div>
+      <div class="flex items-center gap-3">
+        <input id="manual-tokens" type="number" value="${state.tokens}"
+          class="flex-1 rounded-xl py-3 px-3.5 text-white text-[14px]" style="background:var(--bg-soft); border:1.5px solid var(--line); outline:none;" />
+        <button id="set-tokens-btn" class="btn-press rounded-xl py-3 px-4 font-display font-bold text-[13px]" style="background:var(--c-academic); color:#0b0d1f;">Set</button>
+      </div>
+    </div>
+    <div class="quest-card p-4 mb-4">
+      <div class="font-display font-bold text-white text-[14px] mb-1">Reset all checked tasks</div>
+      <div class="text-[12.5px] text-[var(--ink-dim)] mb-3">Unchecks every quest without touching token balance or the shop.</div>
+      <button id="reset-tasks-btn" class="w-full btn-press rounded-xl py-3 font-display font-bold text-[13px]" style="background:var(--card-hi); color:white; border:1px solid var(--line);">Uncheck All Quests</button>
+    </div>
+    <div class="quest-card p-4 mb-4" style="border-color: rgba(251,113,133,0.4);">
+      <div class="font-display font-bold text-white text-[14px] mb-1">Full reset</div>
+      <div class="text-[12.5px] text-[var(--ink-dim)] mb-3">Wipes tokens, tasks, shop and purchase history back to the original defaults. This cannot be undone.</div>
+      <button id="full-reset-btn" class="w-full btn-press rounded-xl py-3 font-display font-bold text-[13px]" style="background:rgba(251,113,133,0.15); color:#fb7185; border:1px solid rgba(251,113,133,0.4);">Erase Everything &amp; Start Fresh</button>
+    </div>
+  `;
+}
+
+function attachSettingsHandlers(){
+  document.getElementById("settings-close").onclick = () => { document.getElementById("modal-root").innerHTML = ""; };
+
+  document.querySelectorAll("[data-settingstab]").forEach(btn => {
+    btn.onclick = () => { settingsTab = btn.dataset.settingstab; refreshSettingsBody(); };
+  });
+
+  attachSettingsBodyHandlers();
+}
+
+function refreshSettingsBody(){
+  document.getElementById("modal-root").querySelector("#settings-sheet").innerHTML = settingsInnerHtml();
+  lucide.createIcons();
+  document.getElementById("settings-close").onclick = () => { document.getElementById("modal-root").innerHTML = ""; };
+  document.querySelectorAll("[data-settingstab]").forEach(btn => {
+    btn.onclick = () => { settingsTab = btn.dataset.settingstab; refreshSettingsBody(); };
+  });
+  attachSettingsBodyHandlers();
+}
+
+function attachSettingsBodyHandlers(){
+  if(settingsTab === "tasks"){
+    document.querySelectorAll("[data-settaskcat]").forEach(btn => {
+      btn.onclick = () => { settingsTaskCat = btn.dataset.settaskcat; refreshSettingsBody(); };
+    });
+    document.querySelectorAll("[data-deltask]").forEach(btn => {
+      btn.onclick = () => {
+        const id = parseInt(btn.dataset.deltask, 10);
+        state.tasks = state.tasks.filter(t => t.id !== id);
+        saveState();
+        refreshSettingsBody();
+        render();
+      };
+    });
+    const addBtn = document.getElementById("add-task-btn");
+    if(addBtn) addBtn.onclick = () => {
+      const input = document.getElementById("new-task-text");
+      const text = input.value.trim();
+      if(!text) return;
+      const nextId = Math.max(0, ...state.tasks.map(t=>t.id)) + 1;
+      state.tasks.push({ id: nextId, cat: settingsTaskCat, text, done: false, doneAt: null });
+      saveState();
+      refreshSettingsBody();
+      render();
+    };
+  }
+
+  if(settingsTab === "shop"){
+    document.querySelectorAll("[data-delshop]").forEach(btn => {
+      btn.onclick = () => {
+        const id = parseInt(btn.dataset.delshop, 10);
+        state.shop = state.shop.filter(s => s.id !== id);
+        saveState();
+        refreshSettingsBody();
+        render();
+      };
+    });
+    const addBtn = document.getElementById("add-shop-btn");
+    if(addBtn) addBtn.onclick = () => {
+      const nameInput = document.getElementById("new-shop-name");
+      const priceInput = document.getElementById("new-shop-price");
+      const name = nameInput.value.trim();
+      const price = parseInt(priceInput.value, 10);
+      if(!name || !price || price <= 0) return;
+      const icons = ["star","gift","sparkles","heart","trophy","gem"];
+      const nextId = Math.max(0, ...state.shop.map(s=>s.id)) + 1;
+      state.shop.push({ id: nextId, name, price, icon: icons[Math.floor(Math.random()*icons.length)] });
+      saveState();
+      refreshSettingsBody();
+      render();
+    };
+  }
+
+  if(settingsTab === "data"){
+    const setTok = document.getElementById("set-tokens-btn");
+    if(setTok) setTok.onclick = () => {
+      const v = parseInt(document.getElementById("manual-tokens").value, 10);
+      if(!isNaN(v) && v >= 0){ state.tokens = v; saveState(); render(); refreshSettingsBody(); }
+    };
+    const resetTasks = document.getElementById("reset-tasks-btn");
+    if(resetTasks) resetTasks.onclick = () => {
+      state.tasks.forEach(t => { t.done = false; t.doneAt = null; });
+      saveState();
+      render();
+      refreshSettingsBody();
+    };
+    const fullReset = document.getElementById("full-reset-btn");
+    if(fullReset) fullReset.onclick = () => {
+      if(confirm("This erases all tasks, tokens, and shop history. Are you sure?")){
+        state = defaultState();
+        saveState();
+        document.getElementById("modal-root").innerHTML = "";
+        currentTab = "home";
+        render();
+      }
+    };
+  }
+}
+
+/* ============================================================
+   MAIN EVENT HANDLERS
+   ============================================================ */
+function attachHandlers(){
+  // Tab bar
+  document.querySelectorAll("[data-tab]").forEach(btn => {
+    btn.onclick = () => { currentTab = btn.dataset.tab; render(); window.scrollTo(0,0); };
+  });
+
+  // Home: go to category in Tasks tab
+  document.querySelectorAll("[data-goto-cat]").forEach(btn => {
+    btn.onclick = () => {
+      currentTaskCat = btn.dataset.gotoCat;
+      currentTab = "tasks";
+      render();
+      window.scrollTo(0,0);
+    };
+  });
+
+  // Settings gate
+  const settingsBtn = document.getElementById("open-settings");
+  if(settingsBtn) settingsBtn.onclick = openParentGate;
+
+  // Task category tabs (Quests page)
+  document.querySelectorAll("[data-tasktab]").forEach(btn => {
+    btn.onclick = () => { currentTaskCat = btn.dataset.tasktab; render(); };
+  });
+
+  // Toggle a task done/undone
+  document.querySelectorAll("[data-toggle]").forEach(btn => {
+    btn.onclick = (e) => {
+      const id = parseInt(btn.dataset.toggle, 10);
+      const task = state.tasks.find(t => t.id === id);
+      if(!task) return;
+      task.done = !task.done;
+      task.doneAt = task.done ? Date.now() : null;
+      if(task.done){
+        state.tokens += 10;
+        fireConfetti(btn);
+      }else{
+        state.tokens = Math.max(0, state.tokens - 10);
+      }
+      saveState();
+      render();
+    };
+  });
+
+  // Buy a shop item
+  document.querySelectorAll("[data-buy]").forEach(btn => {
+    btn.onclick = () => {
+      const id = parseInt(btn.dataset.buy, 10);
+      const item = state.shop.find(s => s.id === id);
+      if(!item || state.tokens < item.price) return;
+      state.tokens -= item.price;
+      state.purchases.push({ id: item.id, name: item.name, price: item.price, boughtAt: Date.now() });
+      saveState();
+      bigConfetti();
+      render();
+    };
+  });
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+render();
+
+</script>
+</body>
+</html>
