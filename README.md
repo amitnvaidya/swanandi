@@ -1,2 +1,2 @@
 # swanandi
-For Swanandi’snapps
+For Swanandi’s apps
