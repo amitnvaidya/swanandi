@@ -7,6 +7,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -33,21 +35,19 @@
   }
   *{-webkit-tap-highlight-color: transparent;}
   html,body{
-		    background: radial-gradient(1200px 800px at 20% -10%, #1c2150 0%, var(--bg) 55%), var(--bg);
-		    color: var(--ink);
-		    font-family: 'Inter', sans-serif;
-		    overscroll-behavior-y: none;
+    background: radial-gradient(1200px 800px at 20% -10%, #1c2150 0%, var(--bg) 55%), var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
   }
   .font-display{ font-family: 'Baloo 2', sans-serif; }
-  /* hide scrollbars but keep scrolling */
   .no-scrollbar::-webkit-scrollbar{ display:none; }
   .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
 
   .safe-top{ padding-top: env(safe-area-inset-top); }
   .safe-bottom{ padding-bottom: env(safe-area-inset-bottom); }
 
-  /* Console-style card */
   .quest-card{
     background: linear-gradient(180deg, var(--card-hi), var(--card));
     border: 1px solid var(--line);
@@ -159,14 +159,28 @@
 
 <script>
 /* ============================================================
-   SUMMER QUEST DASHBOARD
-   Single-file app. No build step. Tailwind + Lucide + canvas-confetti via CDN.
-   Data persists to localStorage under key "summerQuest_v1".
+   SUMMER QUEST DASHBOARD — FIREBASE VERSION
+   Now saves data to Firebase Realtime Database in the cloud!
    ============================================================ */
 
+// Initialize Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyBwiIthmbpWEZRbbnteE-W2FpIxKgzKJYY",
+  authDomain: "summer-plan-517bb.firebaseapp.com",
+  databaseURL: "https://summer-plan-517bb-default-rtdb.firebaseio.com",
+  projectId: "summer-plan-517bb",
+  storageBucket: "summer-plan-517bb.firebasestorage.app",
+  messagingSenderId: "558200373174",
+  appId: "1:558200373174:web:e731777e50eb4080264b17"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
 const STORAGE_KEY = "summerQuest_v1";
 
-/* ---------- Default categories (seeded from this chat's plans) ---------- */
+// Track if we're syncing to avoid infinite loops
+let isSyncing = false;
+
 const DEFAULT_CATEGORIES = [
   { id: "academic", label: "Academic",  icon: "book-open",     color: "var(--c-academic)", colorDeep: "var(--c-academic-deep)" },
   { id: "sport",    label: "Sport & Fitness", icon: "dumbbell", color: "var(--c-sport)",    colorDeep: "var(--c-sport-deep)" },
@@ -175,13 +189,11 @@ const DEFAULT_CATEGORIES = [
   { id: "writing",  label: "Writing",     icon: "feather",      color: "var(--c-writing)",  colorDeep: "var(--c-writing-deep)" },
 ];
 
-/* ---------- Seed tasks: a representative slice from each plan ---------- */
 function seedTasks(){
   const t = [];
   let id = 1;
   const push = (cat, text) => t.push({ id: id++, cat, text, done: false, doneAt: null });
 
-  // Academic — daily structure + a few concrete sample days
   push("academic","Session 1 (08:00): Maths — today's GC book pages");
   push("academic","Session 2 (09:00): VR / NVR / English Comprehension");
   push("academic","Session 3 (10:00): Science / History / Geography / French");
@@ -189,7 +201,6 @@ function seedTasks(){
   push("academic","GC Vocabulary flashcards (10 min, morning)");
   push("academic","Saturday mock paper — Maths + English GL");
 
-  // Sport & Fitness
   push("sport","Heat knee 15 min before sport");
   push("sport","Today's sport session (Cricket / RAD Ballet / Fencing)");
   push("sport","Ice knee 15–20 min after sport");
@@ -197,7 +208,6 @@ function seedTasks(){
   push("sport","Hip abductor + calf raise strength set");
   push("sport","Saturday swim or gentle walk");
 
-  // Meals
   push("meals","Breakfast eaten");
   push("meals","Mid-morning snack (Chiwda / fruit)");
   push("meals","Lunch eaten");
@@ -205,13 +215,11 @@ function seedTasks(){
   push("meals","Dinner eaten with green veg");
   push("meals","Haldi doodh before bed");
 
-  // Chess
   push("chess","ChessKid lesson (10 min)");
   push("chess","Puzzle Rush — untimed accuracy practice");
   push("chess","1 game vs CPU or live opponent");
   push("chess","Write down 1 lesson from today's game");
 
-  // Writing
   push("writing","Today's writing piece (descriptive / recount / summary / essay)");
   push("writing","Read piece aloud, fix 1 sentence");
   push("writing","Add 1 new word from the vocabulary list");
@@ -219,7 +227,6 @@ function seedTasks(){
   return t;
 }
 
-/* ---------- Default shop items ---------- */
 function seedShop(){
   return [
     { id: 1, name: "30 Mins Screen Time", price: 50, icon: "tablet-smartphone" },
@@ -233,7 +240,6 @@ function seedShop(){
   ];
 }
 
-/* ---------- State ---------- */
 let state = loadState();
 
 function defaultState(){
@@ -242,8 +248,8 @@ function defaultState(){
     tasks: seedTasks(),
     categories: DEFAULT_CATEGORIES,
     shop: seedShop(),
-    purchases: [], // {id, name, price, boughtAt}
-    history: [],   // {taskId, action, ts} not strictly required but nice for future
+    purchases: [],
+    history: [],
   };
 }
 
@@ -252,7 +258,6 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    // basic shape guard
     if(!parsed.tasks || !parsed.shop || !parsed.categories) return defaultState();
     return parsed;
   }catch(e){
@@ -261,12 +266,39 @@ function loadState(){
   }
 }
 
+// Save to localStorage first
 function saveState(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-/* ---------- Router ---------- */
-let currentTab = "home"; // home | tasks | shop | settings(gated)
+// Sync to Firebase
+function syncToFirebase(){
+  if(isSyncing) return;
+  isSyncing = true;
+  database.ref(STORAGE_KEY).set(state).catch(err => {
+    console.error("Firebase sync error:", err);
+  }).finally(() => {
+    isSyncing = false;
+  });
+}
+
+// Listen for Firebase updates
+function listenToFirebase(){
+  database.ref(STORAGE_KEY).on('value', snapshot => {
+    if(isSyncing) return; // Don't update if we just synced
+    const data = snapshot.val();
+    if(data){
+      state = data;
+      render();
+    }
+  }, err => {
+    console.warn("Firebase listen error:", err);
+  });
+}
+
+listenToFirebase();
+
+let currentTab = "home";
 let currentTaskCat = "academic";
 
 function render(){
@@ -279,7 +311,6 @@ function render(){
   attachHandlers();
 }
 
-/* ---------- Helpers ---------- */
 function catTasks(catId){ return state.tasks.filter(t => t.cat === catId); }
 function catDoneCount(catId){ return catTasks(catId).filter(t => t.done).length; }
 function catPct(catId){
@@ -371,7 +402,6 @@ function renderHome(){
       </button>
     </div>
 
-    <!-- Level + token hero -->
     <div class="quest-card p-5 mb-5 relative overflow-hidden" style="--accent:var(--gold); --accent-deep:var(--gold-deep);">
       <div class="absolute -right-8 -top-8 w-40 h-40 rounded-full opacity-20 float-y" style="background: radial-gradient(circle, var(--gold), transparent 70%);"></div>
       <div class="flex items-center gap-4 relative">
@@ -395,7 +425,6 @@ function renderHome(){
       </div>
     </div>
 
-    <!-- Today progress -->
     <div class="quest-card p-4 mb-5 flex items-center gap-4" style="--accent:#7dd3fc;">
       <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style="background: rgba(125,211,252,0.15);">
         <i data-lucide="target" class="w-6 h-6 text-sky-300"></i>
@@ -548,10 +577,10 @@ function renderTabbar(){
 }
 
 /* ============================================================
-   PARENT GATE — simple multiplication problem
+   PARENT GATE
    ============================================================ */
 function randomMathProblem(){
-  const a = Math.floor(Math.random()*9) + 2;  // 2-10
+  const a = Math.floor(Math.random()*9) + 2;
   const b = Math.floor(Math.random()*9) + 2;
   return { a, b, answer: a*b };
 }
@@ -605,7 +634,7 @@ function openParentGate(){
 /* ============================================================
    SETTINGS / PARENT ADMIN PANEL
    ============================================================ */
-let settingsTab = "tasks"; // tasks | shop | data
+let settingsTab = "tasks";
 let settingsTaskCat = "academic";
 
 function openSettings(){
@@ -759,6 +788,7 @@ function attachSettingsBodyHandlers(){
         const id = parseInt(btn.dataset.deltask, 10);
         state.tasks = state.tasks.filter(t => t.id !== id);
         saveState();
+        syncToFirebase();
         refreshSettingsBody();
         render();
       };
@@ -771,6 +801,7 @@ function attachSettingsBodyHandlers(){
       const nextId = Math.max(0, ...state.tasks.map(t=>t.id)) + 1;
       state.tasks.push({ id: nextId, cat: settingsTaskCat, text, done: false, doneAt: null });
       saveState();
+      syncToFirebase();
       refreshSettingsBody();
       render();
     };
@@ -782,6 +813,7 @@ function attachSettingsBodyHandlers(){
         const id = parseInt(btn.dataset.delshop, 10);
         state.shop = state.shop.filter(s => s.id !== id);
         saveState();
+        syncToFirebase();
         refreshSettingsBody();
         render();
       };
@@ -797,6 +829,7 @@ function attachSettingsBodyHandlers(){
       const nextId = Math.max(0, ...state.shop.map(s=>s.id)) + 1;
       state.shop.push({ id: nextId, name, price, icon: icons[Math.floor(Math.random()*icons.length)] });
       saveState();
+      syncToFirebase();
       refreshSettingsBody();
       render();
     };
@@ -806,12 +839,13 @@ function attachSettingsBodyHandlers(){
     const setTok = document.getElementById("set-tokens-btn");
     if(setTok) setTok.onclick = () => {
       const v = parseInt(document.getElementById("manual-tokens").value, 10);
-      if(!isNaN(v) && v >= 0){ state.tokens = v; saveState(); render(); refreshSettingsBody(); }
+      if(!isNaN(v) && v >= 0){ state.tokens = v; saveState(); syncToFirebase(); render(); refreshSettingsBody(); }
     };
     const resetTasks = document.getElementById("reset-tasks-btn");
     if(resetTasks) resetTasks.onclick = () => {
       state.tasks.forEach(t => { t.done = false; t.doneAt = null; });
       saveState();
+      syncToFirebase();
       render();
       refreshSettingsBody();
     };
@@ -820,6 +854,7 @@ function attachSettingsBodyHandlers(){
       if(confirm("This erases all tasks, tokens, and shop history. Are you sure?")){
         state = defaultState();
         saveState();
+        syncToFirebase();
         document.getElementById("modal-root").innerHTML = "";
         currentTab = "home";
         render();
@@ -832,12 +867,10 @@ function attachSettingsBodyHandlers(){
    MAIN EVENT HANDLERS
    ============================================================ */
 function attachHandlers(){
-  // Tab bar
   document.querySelectorAll("[data-tab]").forEach(btn => {
     btn.onclick = () => { currentTab = btn.dataset.tab; render(); window.scrollTo(0,0); };
   });
 
-  // Home: go to category in Tasks tab
   document.querySelectorAll("[data-goto-cat]").forEach(btn => {
     btn.onclick = () => {
       currentTaskCat = btn.dataset.gotoCat;
@@ -847,16 +880,13 @@ function attachHandlers(){
     };
   });
 
-  // Settings gate
   const settingsBtn = document.getElementById("open-settings");
   if(settingsBtn) settingsBtn.onclick = openParentGate;
 
-  // Task category tabs (Quests page)
   document.querySelectorAll("[data-tasktab]").forEach(btn => {
     btn.onclick = () => { currentTaskCat = btn.dataset.tasktab; render(); };
   });
 
-  // Toggle a task done/undone
   document.querySelectorAll("[data-toggle]").forEach(btn => {
     btn.onclick = (e) => {
       const id = parseInt(btn.dataset.toggle, 10);
@@ -871,11 +901,11 @@ function attachHandlers(){
         state.tokens = Math.max(0, state.tokens - 10);
       }
       saveState();
+      syncToFirebase();
       render();
     };
   });
 
-  // Buy a shop item
   document.querySelectorAll("[data-buy]").forEach(btn => {
     btn.onclick = () => {
       const id = parseInt(btn.dataset.buy, 10);
@@ -884,15 +914,13 @@ function attachHandlers(){
       state.tokens -= item.price;
       state.purchases.push({ id: item.id, name: item.name, price: item.price, boughtAt: Date.now() });
       saveState();
+      syncToFirebase();
       bigConfetti();
       render();
     };
   });
 }
 
-/* ============================================================
-   INIT
-   ============================================================ */
 render();
 
 </script>
